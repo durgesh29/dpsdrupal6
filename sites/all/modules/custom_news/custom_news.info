@@ -1,0 +1,8 @@
+; custom news module ver 6.x-1.0-beta
+
+core = 6.x
+name = custom news
+description = Custom news module is customization the updated news
+version = 6.x-1.0-beta
+package = custom
+project = custom_news

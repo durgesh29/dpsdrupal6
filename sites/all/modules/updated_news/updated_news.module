@@ -1,0 +1,3 @@
+<?php
+
+include_once('updated_news.features.inc');

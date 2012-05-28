@@ -1,0 +1,62 @@
+<?php
+
+/**
+ * @file
+ * Create, update, and delete
+ */
+
+/**
+ * Implementation of hook_views_pre_execute(&$view).
+ */
+
+/* function custom_news_views_pre_execute(&$view) {
+  // Check site views name
+  switch ($view->name) {
+    // If it's my view
+    case 'News':
+      switch ($view->current_display) {
+        // If it's News page
+        case 'page_1':
+          // Rewrite the query
+          $main_query = $view->build_info['query'];
+          $filter = " WHERE node.type = 'News' AND node.status = 1 ";
+          $sort = " ORDER BY node_data_field_news_date.field_news_date_value DESC ";
+          $view->build_info['query'] = $main_query . $filter . $sort;
+
+        break;
+      }
+  }
+} */
+
+/**
+ * Implementation of hook_views_query_alter(&$view, &$query).
+ */
+
+function custom_news_views_query_alter(&$view, &$query) {
+  // Check site views name
+  switch ($view->name) {
+    // If it's my view
+    case 'News':
+      switch ($view->current_display) {
+        // If it's News page
+        case 'page_1':
+          $query->where[0]['clauses'][] = 'node.status = 1';
+          $query->where[0]['clauses'][] = 'node.type in ("%s")';
+          $query->where[0]['args'][] = 'news';
+          $query->where[0]['type'] = 'AND';
+          $query->orderby[] = 'node_data_field_news_date_field_news_date_value DESC';
+
+        break;
+      }
+  }
+}
+
+/**
+ * Implementation of pa($value).
+ */
+
+function pa($value) {
+  print '<pre>';
+  print_r($value);
+  print '</pre>';
+}
