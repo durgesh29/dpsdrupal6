@@ -1,0 +1,8 @@
+; custom payment module ver 6.x-1.0-beta
+
+core = 6.x
+name = custom direcpay
+description = Custom payment module is customization the use direcpay gateway for payment.
+version = 6.x-1.0-beta
+package = custom
+project = custom_pay

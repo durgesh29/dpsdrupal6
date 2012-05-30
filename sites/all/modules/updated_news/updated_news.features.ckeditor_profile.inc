@@ -1,11 +1,6 @@
 <?php
 
 /**
- * @file
- * create, update and modify
- */
-
-/**
  * Implementation of hook_ckeditor_profile_defaults().
  */
 function updated_news_ckeditor_profile_defaults() {

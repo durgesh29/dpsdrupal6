@@ -1,0 +1,13 @@
+name = "EBS"
+description = "Enable payment processing using EBS."
+dependencies[] = uc_payment
+dependencies[] = currency_api
+core = 6.x
+package = Ubercart - payment
+
+; Information added by drupal.org packaging script on 2011-06-16
+version = "6.x-1.0"
+core = "6.x"
+project = "uc_ebs"
+datestamp = "1308214920"
+

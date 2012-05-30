@@ -1,11 +1,6 @@
 <?php
 
 /**
- * @file
- * create, update and modify
- */
-
-/**
  * Implementation of hook_user_default_roles().
  */
 function updated_news_user_default_roles() {

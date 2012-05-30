@@ -1,0 +1,316 @@
+<?php
+
+/**
+ * @file
+ * Integrates http://www.timesofmoney.com/direcpay/jsp/home.jsp's payment service with Ubercart.
+ */
+
+function uc_direcpay_menu() {
+    $items['direcpay_response'] = array(
+    'title' => 'Direcpay Payment Gateway',
+    'page callback' => 'uc_direcpay_response',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+/**
+ * Implementation of hook_init().
+ * Notice how we alter the checkout review form to post the order to direcpay.
+ */
+
+function uc_direcpay_init() { 
+  drupal_add_js(drupal_get_path('module', 'uc_direcpay') . '/script/dpEncodeRequest.js');
+  drupal_add_js(drupal_get_path('module', 'uc_direcpay') . '/script/encodeTxnRequest.js');
+}
+
+/**
+ * Implementation of hook_form_alter().
+ * Notice how we alter the checkout review form to post the order to direcpay.
+ */
+function uc_direcpay_form_alter(&$form, &$form_state, $form_id) {
+
+  if ($form_id == 'uc_cart_checkout_review_form' && ($order_id = intval($_SESSION['cart_order'])) > 0) {
+    $order = uc_order_load($order_id);
+
+    if ($order->payment_method == 'direcpay') {
+      unset($form['submit']);
+      $form['#prefix'] = '<table style="display: inline; padding-top: 1em;"><tr><td>';
+      $form['#suffix'] = '</td><td>'. drupal_get_form('uc_direcpay_form', $order) .'</td></tr></table>';
+    }
+  }
+}
+
+/**
+ * Implementation of hook_payment_method().
+ */
+
+function uc_direcpay_payment_method() {
+  $path = base_path() . drupal_get_path('module', 'uc_direcpay');
+  // direcpay image.
+  $title = '<img src="'. $path .'/img/direcpay.png" style="position: relative; top: 5px; margin-right: 4px;">';
+  $title .= t('Credit card on a secure Direcpay server');
+
+  $methods[] = array(
+    'id' => 'direcpay',
+    'name' => t('Direcpay'),
+    'title' => $title,
+    'desc' => t('Direcpay payment service'),
+    'callback' => 'uc_payment_method_direcpay',
+    'weight' => 1,
+    'checkout' => TRUE,
+    'no_gateway' => TRUE,    
+  );
+  return $methods;
+}
+
+
+// Adds direcpay settings to the payment method settings form.
+function uc_payment_method_direcpay($op, &$arg1) {
+  switch ($op) {
+    case 'settings':
+      $form['id_info'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Direcpay identification information'),
+        '#collapsible' => FALSE,
+        '#collapsed' => FALSE,
+      );
+      $form['id_info']['uc_direcpay_merchant_id'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Merchant ID'),
+        '#description' => t('Your Direcpay Merchant ID.'),
+        '#default_value' => variable_get('uc_direcpay_merchant_id', ''),
+        '#size' => 12,
+        '#required' => TRUE,
+      );
+      $form['id_info']['uc_direcpay_operating_mode'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Operating Mode'),
+        '#description' => t('Your Direcpay Operating Mode.'),
+        '#default_value' => variable_get('uc_direcpay_operating_mode', 'DOM'),
+        '#size' => 12,
+        '#required' => TRUE,
+      );
+      $form['pay_info'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Payment information'),
+        '#description' => t(''),
+        '#collapsible' => FALSE,
+        '#collapsed' => FALSE,
+      );
+      $form['pay_info']['uc_direcpay_server'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Direcpay server'),
+        '#description' => t('The posting URLs for integration are as follows: <br /> For DirecPay staging (testing) environment: <br /> https://test.timesofmoney.com/direcpay/secure/dpMerchantTransaction.jsp <br /> For DirecPay live (production) environment: <br /> https://www.timesofmoney.com/direcpay/secure/dpMerchantTransaction.jsp'),
+        '#default_value' => variable_get('uc_direcpay_server', 'https://test.timesofmoney.com/direcpay/secure/dpMerchantTransaction.jsp'),
+      );      
+      $form['pay_info']['uc_direcpay_method'] = array(
+        '#type' => 'select',
+        '#title' => t('Payment method (Collaborator)'),
+        '#description' => t('The method for capturing payment.'),
+        '#options' => array(
+          'LIVE' => t('DirecPay'),
+          'TEST' => t('TOML'),
+        ),
+        '#default_value' => variable_get('uc_direcpay_method', 'TEST'),
+      );
+      $form['pay_info']['uc_direcpay_rate'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Exchange rate'),
+        '#description' => t("The rate of exchange between your site's default currency and INR. If left blank, currency_api is used."),
+        '#default_value' => variable_get('uc_direcpay_rate', NULL),
+      );
+      $form['custom_info'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('User experience customization'),
+        '#collapsible' => FALSE,
+        '#collapsed' => FALSE,
+      );
+      $form['custom_info']['uc_direcpay_return_location'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Return location'),
+        '#description' => t('Customize where the user will land when returning from the Direcpay payment page. You may specify &lt;front&gt; for the front page of the site, or &lt;variables&gt; to return the user to a list of variables Direcpay transmitted back.'),
+        '#default_value' => variable_get('uc_direcpay_return_location', '<front>'),
+      );
+      $form['custom_info']['uc_direcpay_checkout_link'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Submit button text'),
+        '#description' => t('Provide text for the submit button on the order review page.'),
+        '#default_value' => variable_get('uc_direcpay_checkout_link', t('Submit order')),
+      );
+      return $form;
+  }
+}
+
+// Form to build the submission to direcpay.in.
+function uc_direcpay_form($form_state,$order) {
+  
+  // Get the order total in the default currency.
+  $order_total = uc_currency_format($order->order_total, TRUE, FALSE, '.');
+  
+  // Convert any monetary value from the store's currency to Indian Rupees.
+  $result = _uc_direcpay_currency_calc($order->order_total);
+  
+  // Get the converted total and the rate of conversion
+  $inr_total = uc_currency_format($result['value'], FALSE, FALSE, '.');
+  $inr_rate = uc_currency_format($result['rate'], FALSE, FALSE, '.');
+  
+  // Make a description for the user
+   $description .= t('Order @order from @store.', array('@order' => $order->order_id, '@store' => variable_get('uc_store_name', t('Ubercart'))));
+   $description .= t(' (Total order value of !order_total calculated at $1 to !inr_rate INR)', array(
+     '!inr_total' => $inr_total,
+     '!order_total' => $order_total,
+     '!inr_rate' => $inr_rate,
+   ));
+
+  
+  // General information
+  $data = array(
+    'return_url' => url('direcpay_response', array('query' => 'DR={DR}','absolute' => TRUE)),
+    'requestparameter' => variable_get('uc_direcpay_merchant_id', '') . '|' . variable_get('uc_direcpay_operating_mode', 'DOM') . '|INR|' . $inr_total . '|' . $order->order_id . '|' . $description . '|http://localhost/durgesh/pay/success.php|http://localhost/durgesh/pay/fail.php' . variable_get('uc_direcpay_method', 'LIVE'), 
+  );
+  
+  // Address information.
+  $data = array_merge($data, _uc_direcpay_address($order, 'billing'));
+  if (uc_order_is_shippable($order)) {
+    $data = array_merge($data, _uc_direcpay_address($order, 'delivery'));
+  }
+  
+  // Put the data on a form.
+  foreach ($data as $name => $value) {
+    $form[$name] = array('#type' => 'hidden', '#value' => $value);
+  }
+
+  $form['#action'] = variable_get('uc_direcpay_server', 'https://test.timesofmoney.com/direcpay/secure/dpMerchantTransaction.jsp');  
+  // Shoot the user to direcpay upon submission.
+  $form['submit_info'] = array(
+    '#value' => '<a href="https://test.timesofmoney.com/direcpay/secure/dpMerchantTransaction.jsp?'. $data['requestparameter'] .'">' . variable_get('uc_direcpay_checkout_link', t('Submit order')) . '</a>',
+  );
+
+  
+  return $form;
+}
+
+function _uc_direcpay_currency_calc($total) {
+  $rate = variable_get('uc_direcpay_rate', NULL);
+  if (!$rate) {
+    $result = currency_api_convert(variable_get('uc_currency_code', 'USD'), 'INR', $total);
+  }
+  else {
+    $result['value'] = $total * $rate;
+    $result['rate'] = $rate;
+  }
+  return $result;
+}
+
+/**
+ * Builds the direcpay data for an order's addresses.
+ */
+function _uc_direcpay_address($order, $address_type) {
+
+  // Get the 2 digit ISO code for the given country.
+  $country = uc_get_country_data(array('country_id' => $order->{$address_type . '_country'}));
+  if ($country === FALSE) {
+    $country = array(0 => array('country_iso_code_3' => 'USA'));
+  }
+  
+  $arg_name = '';
+  switch ($address_type) {
+    case 'billing':
+      $arg_name = 'cust';
+    break;
+    case 'delivery':
+      $arg_name = 'delivery';
+    break;
+  }
+  $data = array(
+    $arg_name .'Name'     => substr($order->{$address_type .'_first_name'} .' '. $order->{$address_type .'_last_name'}, 0, 100),
+    $arg_name .'Address'  => substr($order->{$address_type .'_street1'}, 0, 100),
+    $arg_name .'City'     => substr($order->{$address_type .'_city'}, 0, 100),
+    $arg_name .'State'    => $order->{$address_type .'_zone'},
+    $arg_name .'PinCode'      => substr($order->{$address_type .'_postal_code'}, 0, 100),
+    $arg_name .'Country'  => $country[0]['country_iso_code_3'],
+    $arg_name .'PhoneNo1'    => substr($order->{$address_type .'_phone'}, 0, 3),
+    $arg_name .'PhoneNo2'    => substr($order->{$address_type .'_phone'}, 3, 7),
+    $arg_name .'PhoneNo3'    => substr($order->{$address_type .'_phone'}, 10, 15),
+    $arg_name .'MobileNo'    => substr($order->{$address_type .'_phone'}, 0, 12),
+    
+    // This isn't actually necessary for shipping info, but it's easier
+    // than writing logic around it. direcpay doesn't care.
+    $arg_name .'EmailId'    => substr($order->primary_email, 0, 100),
+  );
+  
+  return $data;
+}
+
+// Response form, hit by direcpay.in.
+function uc_direcpay_response() {
+  
+  // DR must be set as it is the transmission from the direcpay server.
+  $query = explode('&DR=', $_SERVER['QUERY_STRING']);
+  $dr = $query['1'];
+  if (!$dr) {
+#    watchdog($type, $message, $variables = array(), $severity = WATCHDOG_NOTICE, $link = NULL); 
+    watchdog('uc_direcpay', t('direcpay response without proper GET variable set.'),'', WATCHDOG_ERROR);
+    drupal_goto('<front>');
+  }
+
+  // Include the code for cryptaculation.
+ 
+  // (re) Fix up spaces and convert from base64.
+  $dr = preg_replace("/\s/","+", $dr);
+  $query = base64_decode($dr); 
+  
+  // Decrypt the query.
+  $rc4 = new Crypt_RC4(variable_get('uc_direcpay_account_key', ''));
+  $rc4->decrypt($query);
+  
+  // Split the query string into an associative array.
+  $query = explode('&', $query);
+  $response = array();
+  foreach ($query as $param){
+    list($key, $value) = explode('=', $param);
+    $response[$key] = urldecode($value);
+  }
+  
+  // Check that the transaction is error-free.
+  if (!isset($response['ResponseCode']) || $response['ResponseCode']) {
+    watchdog('uc_direcpay', t("Response returned an error code... The response was: @response", array('@response' => 
+print_r($response, TRUE))), WATCHDOG_ERROR);
+    drupal_goto('<front>');
+  }
+  
+  // Load the order associated with this transaction.
+  if (!($order = uc_order_load($response['MerchantRefNo']))) {
+    watchdog('uc_direcpay', t("The order couldn't be loaded... The response was: @response", array('@response' => print_r($response, 
+TRUE))), WATCHDOG_ERROR);
+    drupal_goto('<front>');
+  }
+  
+  // I don't see any way in the manual to handle partial payments, or to know if it's a partial payment
+  // like PayPal does ...
+  uc_payment_enter($order->order_id, 'direcpay', $response['Amount'], $order->uid, NULL, $response['ResponseMessage']);
+  uc_cart_complete_sale($order);
+  
+  // Mark the payent on the order log.
+  uc_order_comment_save($order->order_id, 0, t('Payment of !amount !currency submitted through direcpay.', array('!amount' => 
+uc_currency_format($response['Amount'], FALSE), '!currency' => 'INR')), 'order', 'payment_received');
+  
+  // Display a table of transaction details.
+  if (variable_get('uc_direcpay_return_location', '<front>') == '<variables>') {
+    $rows = array();
+    foreach ($response as $key => $value) {
+      $rows[] = array($key, $value);
+    }
+    
+    return theme('table', array(array('data' => t('direcpay trasaction details'), 'colspan' => 2)), $rows);
+  }
+  
+  // Redirect the user as specified in the payment method settings.
+  else {
+    drupal_goto(variable_get('uc_direcpay_return_location', '<front>'));
+  }
+}
+

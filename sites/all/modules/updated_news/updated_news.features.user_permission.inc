@@ -1,11 +1,6 @@
 <?php
 
 /**
- * @file
- * create, update and modify
- */
-
-/**
  * Implementation of hook_user_default_permissions().
  */
 function updated_news_user_default_permissions() {

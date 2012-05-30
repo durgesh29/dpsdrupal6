@@ -45,7 +45,7 @@ function custom_news_views_query_alter(&$view, &$query) {
           $query->where[0]['args'][] = 'news';
           $query->where[0]['type'] = 'AND';
           $query->orderby[] = 'node_data_field_news_date_field_news_date_value DESC';
-
+          //pa($query);
         break;
       }
   }

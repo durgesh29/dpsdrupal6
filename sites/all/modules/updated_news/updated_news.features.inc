@@ -1,11 +1,6 @@
 <?php
 
 /**
- * @file
- * create, update and modify
- */
-
-/**
  * Implementation of hook_node_info().
  */
 function updated_news_node_info() {
@@ -23,4 +18,13 @@ function updated_news_node_info() {
     ),
   );
   return $items;
+}
+
+/**
+ * Implementation of hook_views_api().
+ */
+function updated_news_views_api() {
+  return array(
+    'api' => '2',
+  );
 }

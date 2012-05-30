@@ -1,11 +1,6 @@
 <?php
 
 /**
- * @file
- * create, update and modify
- */
-
-/**
  * Implementation of hook_content_default_fields().
  */
 function updated_news_content_default_fields() {
@@ -83,7 +78,7 @@ function updated_news_content_default_fields() {
     'field_name' => 'field_news_image',
     'type_name' => 'news',
     'display_settings' => array(
-      'weight' => '4',
+      'weight' => '-1',
       'parent' => '',
       'label' => array(
         'format' => 'hidden',
